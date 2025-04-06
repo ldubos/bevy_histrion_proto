@@ -1,0 +1,13 @@
+[
+    {
+        "type": "proto_with_assets",
+        "id": "hello",
+        "asset1": "./asset1.my_asset",
+        "asset2": "./asset2.my_asset"
+    },
+    {
+        "type": "my_proto_1",
+        "id": "world",
+        "foo": "bar"
+    }
+]

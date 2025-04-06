@@ -1,0 +1,60 @@
+[workspace]
+resolver = "3"
+members = ["./", "bevy_histrion_proto_derive"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+publish = true
+license = "MIT OR Apache-2.0"
+
+[workspace.lints.clippy]
+type_complexity = "allow"
+too_many_arguments = "allow"
+doc_markdown = "warn"
+semicolon_if_nothing_returned = "warn"
+manual_let_else = "warn"
+match_same_arms = "warn"
+redundant_closure_for_method_calls = "warn"
+
+[package]
+name = "bevy_histrion_proto"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+repository = "https://github.com/ldubos/bevy_histrion_proto"
+categories = ["games", "game-development"]
+keywords = ["bevy", "proto", "data-driven", "schema", "manifest"]
+exclude = ["assets/**/*", ".github/**/*", ".vscode/**/*"]
+
+[features]
+default = ["derive"]
+derive = ["dep:bevy_histrion_proto_derive"]
+schemars = ["dep:schemars", "bevy_histrion_proto_derive/schemars"]
+
+[dependencies]
+bevy_histrion_proto_derive = { version = "0.1.0", path = "./bevy_histrion_proto_derive", optional = true }
+
+bevy = { version = "0.16.0-rc.1", default-features = false, features = [
+  "bevy_asset",
+  "bevy_log",
+] }
+const-fnv1a-hash = "1.1"
+schemars = { version = "0.8", optional = true }
+serde = "1.0"
+serde_json = "1.0"
+thiserror = "2.0.12"
+
+[lints]
+workspace = true
+
+[[example]]
+name = "basic"
+path = "examples/basics/basic.rs"
+doc-scrape-examples = true
+
+[[example]]
+name = "schema"
+path = "examples/basics/schema.rs"
+doc-scrape-examples = true

@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Prototype",
+  "anyOf": [
+    {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/BHPAnyPrototype"
+      }
+    },
+    {
+      "$ref": "#/definitions/BHPAnyPrototype"
+    }
+  ],
+  "definitions": {
+    "BHPAnyPrototype": {
+      "title": "BHPAnyPrototype",
+      "anyOf": [
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "type"
+          ],
+          "properties": {
+            "foo": {
+              "default": "",
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "my_proto_1"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "type"
+          ],
+          "properties": {
+            "bar": {
+              "default": 32,
+              "type": "integer",
+              "format": "int32"
+            },
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "my_proto_2"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "asset1",
+            "asset2",
+            "id",
+            "type"
+          ],
+          "properties": {
+            "asset1": {
+              "type": "string"
+            },
+            "asset2": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "proto_with_assets"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}
