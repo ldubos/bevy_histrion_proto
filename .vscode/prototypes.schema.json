@@ -5,35 +5,56 @@
     {
       "type": "array",
       "items": {
-        "$ref": "#/definitions/BHPAnyPrototype"
+        "$ref": "#/definitions/PrototypeAny"
       }
     },
     {
-      "$ref": "#/definitions/BHPAnyPrototype"
+      "$ref": "#/definitions/PrototypeAny"
     }
   ],
   "definitions": {
-    "BHPAnyPrototype": {
-      "title": "BHPAnyPrototype",
+    "PrototypeAny": {
+      "title": "PrototypeAny",
       "anyOf": [
         {
           "type": "object",
           "required": [
+            "icon",
             "id",
             "type"
           ],
           "properties": {
-            "foo": {
-              "default": "",
+            "damage_multiplier": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "format": "float"
+            },
+            "icon": {
               "type": "string"
             },
             "id": {
               "type": "string"
             },
+            "slow_duration": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "format": "float"
+            },
+            "slow_factor": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "format": "float"
+            },
             "type": {
               "type": "string",
               "enum": [
-                "my_proto_1"
+                "effect"
               ]
             }
           }
@@ -41,51 +62,52 @@
         {
           "type": "object",
           "required": [
+            "effects",
+            "icon",
             "id",
+            "level",
             "type"
           ],
           "properties": {
-            "bar": {
-              "default": 32,
+            "damage": {
+              "default": 1.0,
+              "type": "number",
+              "format": "float"
+            },
+            "effects": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/PrototypeId"
+              }
+            },
+            "icon": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "level": {
               "type": "integer",
-              "format": "int32"
-            },
-            "id": {
-              "type": "string"
+              "format": "uint32",
+              "minimum": 0.0
             },
             "type": {
               "type": "string",
               "enum": [
-                "my_proto_2"
+                "sword"
               ]
             }
           }
+        }
+      ]
+    },
+    "PrototypeId": {
+      "anyOf": [
+        {
+          "type": "string"
         },
         {
-          "type": "object",
-          "required": [
-            "asset1",
-            "asset2",
-            "id",
-            "type"
-          ],
-          "properties": {
-            "asset1": {
-              "type": "string"
-            },
-            "asset2": {
-              "type": "string"
-            },
-            "id": {
-              "type": "string"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "proto_with_assets"
-              ]
-            }
-          }
+          "type": "integer"
         }
       ]
     }

@@ -127,6 +127,32 @@ impl<T> From<&str> for Id<T> {
     }
 }
 
+#[cfg(feature = "schemars")]
+impl<T> schemars::JsonSchema for Id<T> {
+    fn schema_name() -> String {
+        "PrototypeId".to_owned()
+    }
+
+    fn json_schema(_generator: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
+        schemars::schema::Schema::Object(schemars::schema::SchemaObject {
+            subschemas: Some(Box::new(schemars::schema::SubschemaValidation {
+                any_of: Some(vec![
+                    schemars::schema::Schema::Object(schemars::schema::SchemaObject {
+                        instance_type: Some(schemars::schema::InstanceType::String.into()),
+                        ..Default::default()
+                    }),
+                    schemars::schema::Schema::Object(schemars::schema::SchemaObject {
+                        instance_type: Some(schemars::schema::InstanceType::Integer.into()),
+                        ..Default::default()
+                    }),
+                ]),
+                ..Default::default()
+            })),
+            ..Default::default()
+        })
+    }
+}
+
 /// The unique identifier of type `T`.
 ///
 /// Unlike [`Id<T>`](Id) it preserves the original [`String`] used to construct the [`Id`]'s hash.

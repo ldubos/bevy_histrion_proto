@@ -3,11 +3,12 @@ use core::borrow::Borrow;
 use crate::{identifier::Id, prototype::Prototype};
 use bevy::{
     ecs::{
+        event::{Event, EventWriter},
         resource::Resource,
         system::{Res, ResMut, SystemParam},
     },
     platform_support::collections::HashMap,
-    prelude::{Deref, DerefMut},
+    prelude::Deref,
     reflect::*,
 };
 use thiserror::Error;
@@ -143,7 +144,62 @@ pub struct Reg<'w, P: Prototype> {
     registry: Res<'w, PrototypeRegistry<P>>,
 }
 
-#[derive(SystemParam, Deref, DerefMut)]
+#[derive(SystemParam, Deref)]
 pub struct RegMut<'w, P: Prototype> {
+    #[deref]
     registry: ResMut<'w, PrototypeRegistry<P>>,
+    events: EventWriter<'w, RegistryEvent<P>>,
+}
+
+impl<'w, P: Prototype> RegMut<'w, P> {
+    /// Inserts a new prototype into the registry.
+    ///
+    /// If a duplicate entry is found, returns
+    /// [`Err(RegistryError::DuplicateId(id))`](RegistryError::DuplicateId).
+    pub fn insert(&mut self, prototype: P) -> Result<(), RegistryError<P>> {
+        let id = prototype.id();
+        match self.registry.insert(prototype) {
+            Ok(()) => {
+                self.events.write(RegistryEvent::Added(id));
+                Ok(())
+            }
+            Err(err) => return Err(err),
+        }
+    }
+
+    /// Removes a prototype from the registry.
+    ///
+    /// If the prototype is not found, returns
+    /// [`Err(RegistryError::NotFound(id))`](RegistryError::NotFound).
+    pub fn remove(&mut self, id: Id<P>) -> Result<(), RegistryError<P>> {
+        match self.registry.remove(&id) {
+            Ok(prototype) => {
+                self.events.write(RegistryEvent::Removed(prototype));
+                Ok(())
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Removes a prototype from the registry by name.
+    ///
+    /// The prototype removed is returned, if it was found.
+    ///
+    /// If the entry can't be found, returns
+    /// [`Err(RegistryError::NotFound(id))`](RegistryError::NotFound)
+    pub fn remove_by_name(&mut self, name: &str) -> Result<(), RegistryError<P>> {
+        match self.registry.remove_by_name(name) {
+            Ok(prototype) => {
+                self.events.write(RegistryEvent::Removed(prototype));
+                Ok(())
+            }
+            Err(err) => Err(err),
+        }
+    }
+}
+
+#[derive(Event, Debug, Clone, PartialEq, Eq)]
+pub enum RegistryEvent<P: Prototype> {
+    Added(Id<P>),
+    Removed(P),
 }

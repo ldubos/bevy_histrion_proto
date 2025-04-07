@@ -1,0 +1,21 @@
+[
+    {
+        "type": "sword",
+        "id": "wooden_stick",
+        "level": 1,
+        "damage": 1.0,
+        "effects": [],
+        "icon": "icons/wooden_stick.icon"
+    },
+    {
+        "type": "sword",
+        "id": "mighty_sword",
+        "level": 10,
+        "damage": 10.0,
+        "effects": [
+            "bleeding",
+            "freezing"
+        ],
+        "icon": "icons/mighty_sword.icon"
+    }
+]

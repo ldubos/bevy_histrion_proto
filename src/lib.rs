@@ -15,7 +15,7 @@ pub mod prelude {
     pub use super::RegisterPrototype;
     pub use crate::identifier::{Id, NamedId};
     pub use crate::prototype::Prototype;
-    pub use crate::registry::{PrototypeRegistry, Reg, RegMut, RegistryError};
+    pub use crate::registry::{Reg, RegMut, RegistryError, RegistryEvent};
     pub use bevy_histrion_proto_derive::*;
 }
 
@@ -40,7 +40,8 @@ impl RegisterPrototype for App {
             .resource_mut::<PrototypesLoaders>()
             .insert(P::discriminant().to_owned(), system_id);
 
-        self.init_resource::<PrototypeRegistry<P>>();
+        self.init_resource::<PrototypeRegistry<P>>()
+            .add_event::<RegistryEvent<P>>();
 
         #[cfg(feature = "schemars")]
         {
@@ -73,7 +74,7 @@ impl RegisterPrototype for App {
         let any_prototype_schema =
             schemars::schema::Schema::Object(schemars::schema::SchemaObject {
                 metadata: Some(Box::new(schemars::schema::Metadata {
-                    title: Some("BHPAnyPrototype".to_string()),
+                    title: Some("PrototypeAny".to_string()),
                     ..Default::default()
                 })),
                 subschemas: Some(Box::new(schemars::schema::SubschemaValidation {
@@ -95,7 +96,7 @@ impl RegisterPrototype for App {
                 })),
                 ..Default::default()
             });
-        definitions.insert("BHPAnyPrototype".to_owned(), any_prototype_schema);
+        definitions.insert("PrototypeAny".to_owned(), any_prototype_schema);
 
         let draft_settings = schemars::r#gen::SchemaSettings::draft07();
 
@@ -115,16 +116,14 @@ impl RegisterPrototype for App {
                             array: Some(Box::new(schemars::schema::ArrayValidation {
                                 items: Some(schemars::schema::SingleOrVec::Single(Box::new(
                                     schemars::schema::Schema::new_ref(
-                                        "#/definitions/BHPAnyPrototype".to_owned(),
+                                        "#/definitions/PrototypeAny".to_owned(),
                                     ),
                                 ))),
                                 ..Default::default()
                             })),
                             ..Default::default()
                         }),
-                        schemars::schema::Schema::new_ref(
-                            "#/definitions/BHPAnyPrototype".to_owned(),
-                        ),
+                        schemars::schema::Schema::new_ref("#/definitions/PrototypeAny".to_owned()),
                     ]),
                     ..Default::default()
                 })),

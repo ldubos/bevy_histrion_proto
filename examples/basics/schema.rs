@@ -16,9 +16,7 @@ fn main() {
 
     app.add_plugins(DefaultPlugins)
         .add_plugins(bevy_histrion_proto::HistrionProtoPlugin)
-        .register_prototype::<MyPrototype1>()
-        .register_prototype::<MyPrototype2>()
-        .register_prototype::<ProtoWithAssets>();
+        .add_plugins(PrototypesPlugin);
 
     let schema = serde_json::to_string_pretty(&app.get_prototypes_schema()).unwrap();
 

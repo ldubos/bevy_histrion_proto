@@ -1,47 +1,49 @@
 #![allow(dead_code)]
 
 use bevy::{
-    asset::{Asset, AssetLoader, AsyncReadExt, Handle},
-    reflect::Reflect,
+    asset::{AssetLoader, AsyncReadExt},
+    prelude::*,
 };
 use bevy_histrion_proto::prelude::*;
 
 #[derive(Debug, Clone, Prototype)]
-#[prototype(discriminant = "my_proto_1")]
-pub struct MyPrototype1 {
-    #[prototype(id)]
+#[proto(discriminant = "sword")]
+pub struct Sword {
+    #[proto(id)]
     pub id: NamedId<Self>,
-    #[prototype(default = "String::new")]
-    pub foo: String,
+    #[proto(default(1.0))]
+    pub damage: f32,
+    pub level: u32,
+    pub effects: Vec<Id<Effect>>,
+    #[proto(asset)]
+    pub icon: Handle<Icon>,
 }
 
 #[derive(Debug, Clone, Prototype)]
-#[prototype(discriminant = "my_proto_2")]
-pub struct MyPrototype2 {
-    #[prototype(id)]
-    pub id: Id<Self>,
-    #[prototype(default(32))]
-    pub bar: i32,
+#[proto(discriminant = "effect")]
+pub struct Effect {
+    #[proto(id)]
+    pub id: NamedId<Self>,
+    pub damage_multiplier: Option<f32>,
+    pub slow_factor: Option<f32>,
+    pub slow_duration: Option<f32>,
+    #[proto(asset)]
+    pub icon: Handle<Icon>,
 }
 
-#[derive(Debug, Clone, Prototype)]
-#[prototype(discriminant = "proto_with_assets")]
-pub struct ProtoWithAssets {
-    #[prototype(id)]
-    pub id: Id<Self>,
-    #[prototype(asset)]
-    pub asset1: Handle<MyAsset>,
-    #[prototype(asset)]
-    pub asset2: Handle<MyAsset>,
+#[derive(Debug, Clone, Reflect, Asset, Deref)]
+pub struct Icon(char);
+
+impl core::fmt::Display for Icon {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
-#[derive(Debug, Clone, Reflect, Asset, serde::Deserialize)]
-pub struct MyAsset(String);
+pub struct IconLoader;
 
-pub struct MyAssetLoader;
-
-impl AssetLoader for MyAssetLoader {
-    type Asset = MyAsset;
+impl AssetLoader for IconLoader {
+    type Asset = Icon;
     type Settings = ();
     type Error = std::io::Error;
 
@@ -54,10 +56,21 @@ impl AssetLoader for MyAssetLoader {
         let mut text = String::new();
         reader.read_to_string(&mut text).await?;
 
-        Ok(MyAsset(text))
+        Ok(Icon(text.chars().next().unwrap_or('❓')))
     }
 
     fn extensions(&self) -> &[&str] {
-        &["my_asset"]
+        &["icon"]
+    }
+}
+
+pub struct PrototypesPlugin;
+
+impl Plugin for PrototypesPlugin {
+    fn build(&self, app: &mut App) {
+        app.register_prototype::<Sword>()
+            .register_prototype::<Effect>()
+            .init_asset::<Icon>()
+            .register_asset_loader(IconLoader);
     }
 }

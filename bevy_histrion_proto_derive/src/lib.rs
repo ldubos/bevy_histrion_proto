@@ -6,7 +6,7 @@ use proc_macro2_diagnostics::*;
 use quote::{format_ident, quote};
 use syn::{Data, DeriveInput, Fields, parse_macro_input, spanned::Spanned};
 
-#[proc_macro_derive(Prototype, attributes(prototype))]
+#[proc_macro_derive(Prototype, attributes(proto))]
 pub fn prototype_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -38,7 +38,7 @@ pub fn prototype_derive(input: TokenStream) -> TokenStream {
         let mut attrs = PrototypeAttributes::default();
 
         for attr in &input.attrs {
-            if attr.path().is_ident("prototype") {
+            if attr.path().is_ident("proto") {
                 if let Err(err) = attributes::parse_attributes(attr, false, &mut attrs) {
                     return err.emit_as_expr_tokens().into();
                 }
@@ -69,7 +69,7 @@ pub fn prototype_derive(input: TokenStream) -> TokenStream {
         let mut attrs = PrototypeAttributes::default();
 
         for attr in &field.attrs {
-            if attr.path().is_ident("prototype") {
+            if attr.path().is_ident("proto") {
                 if let Err(err) = attributes::parse_attributes(attr, true, &mut attrs) {
                     return err.emit_as_expr_tokens().into();
                 }

@@ -15,27 +15,27 @@ Prototypes are defined using Rust structs with specific attributes. Here's an ex
 
 ```rust
 #[derive(Debug, Clone, Prototype)]
-#[prototype(discriminant = "sword")]
+#[proto(discriminant = "sword")]
 pub struct Sword {
-    #[prototype(id)]
+    #[proto(id)]
     pub id: NamedId<Self>,
-    #[prototype(default(1.0))]
+    #[proto(default(1.0))]
     pub damage: f32,
     pub level: u32,
     pub effects: Vec<Id<Effect>>,
-    #[prototype(asset)]
+    #[proto(asset)]
     pub icon: Handle<Image>,
 }
 
 #[derive(Debug, Clone, Prototype)]
-#[prototype(discriminant = "effect")]
+#[proto(discriminant = "effect")]
 pub struct Effect {
-    #[prototype(id)]
+    #[proto(id)]
     pub id: NamedId<Self>,
     pub damage_multiplier: Option<f32>,
     pub slow_factor: Option<f32>,
     pub slow_duration: Option<f32>,
-    #[prototype(asset)]
+    #[proto(asset)]
     pub icon: Handle<Image>,
 }
 ```
