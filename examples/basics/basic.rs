@@ -34,25 +34,22 @@ fn on_new_sword(
     icons: Res<Assets<Icon>>,
 ) {
     for event in events.read() {
-        match event {
-            RegistryEvent::Added(id) => {
-                let sword = swords.get(id).unwrap();
-                info!(
-                    r#"New sword:
-    id: {}
-    damage: {}
-    level: {}
-    effects: {:?}
-    icon: {}
-"#,
-                    sword.id,
-                    sword.damage,
-                    sword.level,
-                    sword.effects,
-                    icons.get(&sword.icon).unwrap()
-                );
-            }
-            _ => {}
+        if let RegistryEvent::Added(id) = event {
+            let sword = swords.get(id).unwrap();
+            info!(
+                r#"New sword:
+            id: {}
+            damage: {}
+            level: {}
+            effects: {:?}
+            icon: {}
+        "#,
+                sword.id,
+                sword.damage,
+                sword.level,
+                sword.effects,
+                icons.get(&sword.icon).unwrap()
+            );
         }
     }
 }
@@ -63,24 +60,21 @@ fn on_new_effect(
     icons: Res<Assets<Icon>>,
 ) {
     for event in events.read() {
-        match event {
-            RegistryEvent::Added(id) => {
-                let effect = effects.get(id).unwrap();
-                info!(
-                    r#"New effect:
-    id: {}
-    damage_multiplier: x{}
-    slow_factor: {}%
-    slow_duration: {}s
-    icon: {}"#,
-                    effect.id,
-                    effect.damage_multiplier.unwrap_or(1.0),
-                    effect.slow_factor.unwrap_or(0.0) * 100.0,
-                    effect.slow_duration.unwrap_or(0.0),
-                    icons.get(&effect.icon).unwrap()
-                );
-            }
-            _ => {}
+        if let RegistryEvent::Added(id) = event {
+            let effect = effects.get(id).unwrap();
+            info!(
+                r#"New effect:
+        id: {}
+        damage_multiplier: x{}
+        slow_factor: {}%
+        slow_duration: {}s
+        icon: {}"#,
+                effect.id,
+                effect.damage_multiplier.unwrap_or(1.0),
+                effect.slow_factor.unwrap_or(0.0) * 100.0,
+                effect.slow_duration.unwrap_or(0.0),
+                icons.get(&effect.icon).unwrap()
+            );
         }
     }
 }

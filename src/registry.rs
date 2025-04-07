@@ -152,7 +152,7 @@ pub struct RegMut<'w, P: Prototype> {
     events: EventWriter<'w, RegistryEvent<P>>,
 }
 
-impl<'w, P: Prototype> RegMut<'w, P> {
+impl<P: Prototype> RegMut<'_, P> {
     /// Inserts a new prototype into the registry.
     ///
     /// If a duplicate entry is found, returns
@@ -164,7 +164,7 @@ impl<'w, P: Prototype> RegMut<'w, P> {
                 self.events.write(RegistryEvent::Added(id));
                 Ok(())
             }
-            Err(err) => return Err(err),
+            Err(err) => Err(err),
         }
     }
 
