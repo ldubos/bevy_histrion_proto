@@ -1,7 +1,8 @@
 use core::borrow::Borrow;
 
-use crate::{identifier::Id, prototype::Prototype};
+use crate::{RawPrototypeAsset, identifier::Id, prototype::Prototype};
 use bevy::{
+    asset::{AssetId, AssetPath, AssetServer, Handle},
     ecs::{
         event::{Event, EventWriter},
         resource::Resource,
@@ -202,4 +203,28 @@ impl<'w, P: Prototype> RegMut<'w, P> {
 pub enum RegistryEvent<P: Prototype> {
     Added(Id<P>),
     Removed(P),
+}
+
+// TODO: find a better way to avoid dropping assets in case of "indivual" asset loading
+#[derive(Debug, Default, Clone, Resource)]
+pub(crate) struct LoadingPrototypes {
+    pub handles: HashMap<AssetId<RawPrototypeAsset>, Handle<RawPrototypeAsset>>,
+}
+
+#[derive(SystemParam)]
+pub struct PrototypeServer<'w> {
+    asset_server: Res<'w, AssetServer>,
+    loading: ResMut<'w, LoadingPrototypes>,
+}
+
+impl<'w> PrototypeServer<'w> {
+    // TODO: find a way to load only prototypes inside a folder
+    pub fn load_prototypes(&mut self, path: impl Into<AssetPath<'w>>) {
+        let handle: Handle<RawPrototypeAsset> = self.asset_server.load(path);
+        self.loading.handles.insert(handle.id(), handle);
+    }
+
+    pub fn load_prototypes_folder(&mut self, path: impl Into<AssetPath<'w>>) {
+        let _ = self.asset_server.load_folder(path);
+    }
 }

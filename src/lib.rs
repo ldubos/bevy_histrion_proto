@@ -15,7 +15,7 @@ pub mod prelude {
     pub use super::RegisterPrototype;
     pub use crate::identifier::{Id, NamedId};
     pub use crate::prototype::Prototype;
-    pub use crate::registry::{Reg, RegMut, RegistryError, RegistryEvent};
+    pub use crate::registry::{PrototypeServer, Reg, RegMut, RegistryError, RegistryEvent};
     pub use bevy_histrion_proto_derive::*;
 }
 
@@ -170,6 +170,7 @@ pub struct HistrionProtoPlugin;
 impl Plugin for HistrionProtoPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PrototypesLoaders>()
+            .init_resource::<LoadingPrototypes>()
             .init_asset::<prototype::RawPrototypeAsset>()
             .register_asset_loader(prototype::RawPrototypeAssetLoader)
             .add_systems(
@@ -187,9 +188,13 @@ fn on_raw_asset_loaded(
     mut events: EventReader<AssetEvent<prototype::RawPrototypeAsset>>,
     mut assets: ResMut<Assets<prototype::RawPrototypeAsset>>,
     loaders: Res<PrototypesLoaders>,
+    mut loading: ResMut<LoadingPrototypes>,
 ) {
     for mut asset in events.read().filter_map(|event| match event {
-        AssetEvent::LoadedWithDependencies { id } => assets.remove(*id),
+        AssetEvent::LoadedWithDependencies { id } => {
+            loading.handles.remove(id);
+            assets.remove(*id)
+        }
         _ => None,
     }) {
         for raw in asset.drain() {

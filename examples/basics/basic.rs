@@ -20,11 +20,11 @@ fn main() {
     app.run();
 }
 
-fn load_prototypes(asset_server: Res<AssetServer>, have_dlc: Res<HaveDlc>) {
-    let _ = asset_server.load_folder("prototypes");
+fn load_prototypes(mut prototype_server: PrototypeServer, have_dlc: Res<HaveDlc>) {
+    prototype_server.load_prototypes_folder("prototypes");
 
-    if **have_dlc {
-        let _ = asset_server.load_untyped("mega_dlc.proto.json");
+    if have_dlc.0 {
+        prototype_server.load_prototypes("./mega_dlc.proto.json");
     }
 }
 
