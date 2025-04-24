@@ -110,6 +110,7 @@ impl SerdeAttributes {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[allow(clippy::enum_variant_names)]
 pub(crate) enum SerdeRenameAll {
     LowerCase,
     UpperCase,
@@ -175,7 +176,7 @@ impl SerdeRenameAll {
 
         match self {
             LowerCase | SnakeCase => field.to_owned(),
-            UpperCase => field.to_ascii_uppercase(),
+            UpperCase | ScreamingSnakeCase => field.to_ascii_uppercase(),
             PascalCase => {
                 let mut pascal = String::new();
                 let mut capitalize = true;
@@ -195,7 +196,6 @@ impl SerdeRenameAll {
                 let pascal = PascalCase.apply_to_field(field);
                 pascal[..1].to_ascii_lowercase() + &pascal[1..]
             }
-            ScreamingSnakeCase => field.to_ascii_uppercase(),
             KebabCase => field.replace('_', "-"),
             ScreamingKebabCase => ScreamingSnakeCase.apply_to_field(field).replace('_', "-"),
         }
