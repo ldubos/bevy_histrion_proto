@@ -10,19 +10,6 @@ pub(crate) struct PrototypeRegistries {
     registries: HashMap<TypeId, HashMap<ErasedPrototypeId, Box<dyn Reflect>>>,
 }
 
-const _: () = {
-    const fn assert_send_sync<T: ?Sized + Send + Sync + 'static>() {}
-    assert_send_sync::<PrototypeRegistries>();
-    assert_send_sync::<Reg<'_, ()>>();
-    assert_send_sync::<&str>();
-};
-
-impl PrototypeData for () {
-    fn prototype_name() -> &'static str {
-        "()"
-    }
-}
-
 impl PrototypeRegistries {
     pub fn new_registry<P: PrototypeData>(&mut self) {
         self.registries.insert(TypeId::of::<P>(), HashMap::new());
