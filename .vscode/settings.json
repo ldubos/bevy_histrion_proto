@@ -1,11 +1,13 @@
 {
+    "files.associations": {
+        "*.meta": "ron",
+        "*.proto": "json"
+    },
     "json.schemas": [
         {
             "fileMatch": [
-                "*.proto.json",
-                "*.protos.json",
-                "*.prototype.json",
-                "*.prototypes.json"
+                "*.proto",
+                "*.proto.json"
             ],
             "url": "./.vscode/prototypes.schema.json"
         }
