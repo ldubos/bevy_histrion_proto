@@ -1,11 +1,5 @@
 mod prototypes;
 
-#[cfg(not(feature = "schemars"))]
-fn main() {
-    panic!("run this example with --features schemars");
-}
-
-#[cfg(feature = "schemars")]
 fn main() {
     use bevy::prelude::*;
     use bevy_histrion_proto::prelude::*;
@@ -15,12 +9,10 @@ fn main() {
     let mut app = App::new();
 
     app.add_plugins(DefaultPlugins)
-        .add_plugins(bevy_histrion_proto::HistrionProtoPlugin)
+        .add_plugins(bevy_histrion_proto::PrototypesPlugin)
         .add_plugins(PrototypesPlugin);
 
-    let schema = serde_json::to_string_pretty(&app.get_prototypes_schema()).unwrap();
-
+    let schema = app.get_prototypes_schemas();
     println!("{}", &schema);
-
     std::fs::write("./.vscode/prototypes.schema.json", &schema).unwrap();
 }

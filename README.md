@@ -14,28 +14,21 @@
 Prototypes are defined using Rust structs with specific attributes. Here's an example of how to define a `Sword` and an `Effect`:
 
 ```rust
-#[derive(Debug, Clone, Prototype)]
+#[derive(Debug, Clone, JsonSchema, Prototype)]
 #[proto(discriminant = "sword")]
 pub struct Sword {
-    #[proto(id)]
-    pub id: NamedId<Self>,
-    #[proto(default(1.0))]
     pub damage: f32,
     pub level: u32,
-    pub effects: Vec<Id<Effect>>,
-    #[proto(asset)]
+    pub effects: Vec<PrototypeId<Effect>>,
     pub icon: Handle<Image>,
 }
 
-#[derive(Debug, Clone, Prototype)]
+#[derive(Debug, Clone, JsonSchema, Prototype)]
 #[proto(discriminant = "effect")]
 pub struct Effect {
-    #[proto(id)]
-    pub id: NamedId<Self>,
     pub damage_multiplier: Option<f32>,
     pub slow_factor: Option<f32>,
     pub slow_duration: Option<f32>,
-    #[proto(asset)]
     pub icon: Handle<Image>,
 }
 ```
@@ -48,7 +41,7 @@ Once you have defined your prototypes, you can create JSON files to define your 
 [
     {
         "type": "sword",
-        "id": "mighty_sword",
+        "name": "mighty_sword",
         "damage": 3000.0,
         "level": 100,
         "effects": [
@@ -59,13 +52,13 @@ Once you have defined your prototypes, you can create JSON files to define your 
     },
     {
         "type": "effect",
-        "id": "bleeding",
+        "name": "bleeding",
         "damage_multiplier": 3.0,
         "icon": "bleeding_effect.png",
     },
     {
         "type": "effect",
-        "id": "freezing",
+        "name": "freezing",
         "slow_factor": 0.5,
         "slow_duration": 3.0,
         "icon": "freezing_effect.png",

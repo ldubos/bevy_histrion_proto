@@ -6,28 +6,21 @@ use bevy::{
 };
 use bevy_histrion_proto::prelude::*;
 
-#[derive(Debug, Clone, Prototype)]
-#[proto(discriminant = "sword")]
+#[derive(Debug, Default, Clone, Reflect, JsonSchema, Prototype)]
+#[proto(name = "sword")]
 pub struct Sword {
-    #[proto(id)]
-    pub id: NamedId<Self>,
-    #[proto(default(1.0))]
     pub damage: f32,
     pub level: u32,
-    pub effects: Vec<Id<Effect>>,
-    #[proto(asset)]
+    pub effects: Vec<PrototypeId<Effect>>,
     pub icon: Handle<Icon>,
 }
 
-#[derive(Debug, Clone, Prototype)]
-#[proto(discriminant = "effect")]
+#[derive(Debug, Default, Clone, Reflect, JsonSchema, Prototype)]
+#[proto(name = "effect")]
 pub struct Effect {
-    #[proto(id)]
-    pub id: NamedId<Self>,
     pub damage_multiplier: Option<f32>,
     pub slow_factor: Option<f32>,
     pub slow_duration: Option<f32>,
-    #[proto(asset)]
     pub icon: Handle<Icon>,
 }
 
@@ -68,9 +61,9 @@ pub struct PrototypesPlugin;
 
 impl Plugin for PrototypesPlugin {
     fn build(&self, app: &mut App) {
-        app.register_prototype::<Sword>()
-            .register_prototype::<Effect>()
-            .init_asset::<Icon>()
-            .register_asset_loader(IconLoader);
+        app.init_asset::<Icon>()
+            .register_asset_loader(IconLoader)
+            .register_prototype::<Sword>()
+            .register_prototype::<Effect>();
     }
 }

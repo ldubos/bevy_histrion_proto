@@ -1,127 +1,203 @@
-use proc_macro2_diagnostics::Diagnostic;
-use syn::{Attribute, Expr, LitStr, Token, parenthesized};
+use proc_macro2::TokenStream;
+use quote::ToTokens;
+use syn::{Attribute, Expr, Lit, Meta, Token, punctuated::Punctuated};
 
-#[derive(Default)]
-pub struct PrototypeAttributes {
-    pub is_id: bool,
-    pub is_asset: bool,
-    pub discriminant: Option<String>,
-    pub default_func: Option<String>,
-    pub default_expr: Option<Expr>,
+#[derive(Default, Clone)]
+pub(crate) struct SerdeAttributes {
+    pub flatten: bool,
+    pub skip: bool,
+    pub rename: Option<String>,
+    pub untagged: bool,
+    pub tag: Option<TokenStream>,
+    pub content: Option<TokenStream>,
+    pub rename_all: Option<SerdeRenameAll>,
+    pub rename_all_fields: Option<SerdeRenameAll>,
+    pub default: bool,
 }
 
-pub fn parse_attributes(
-    attr: &Attribute,
-    is_field: bool,
-    prototype_attributes: &mut PrototypeAttributes,
-) -> Result<(), Diagnostic> {
-    attr.parse_nested_meta(|nested_meta| match nested_meta.path.get_ident() {
-        Some(ident) => match ident.to_string().as_str() {
-            "id" => {
-                if !is_field {
-                    return Err(nested_meta.error("id attribute can only be used on fields"));
-                }
+impl SerdeAttributes {
+    pub fn try_from_attributes(
+        attrs: &[Attribute],
+        is_field: bool,
+        do_reflect_deserialize: bool,
+    ) -> Result<Self, syn::Error> {
+        let mut serde_attributes = SerdeAttributes::default();
 
-                if prototype_attributes.is_asset
-                    || (prototype_attributes.default_func.is_some()
-                        || prototype_attributes.default_expr.is_some())
-                {
-                    return Err(nested_meta
-                        .error("id attribute cannot be used with asset or default attributes"));
-                }
+        if !do_reflect_deserialize {
+            return Ok(serde_attributes);
+        }
 
-                if prototype_attributes.is_id {
-                    return Err(nested_meta
-                        .error("id attribute cannot be used more than once on the same field"));
-                }
-
-                if !nested_meta.input.is_empty() {
-                    return Err(nested_meta.error("id attribute cannot have any arguments"));
-                }
-
-                prototype_attributes.is_id = true;
-
-                Ok(())
+        for attr in attrs {
+            if !attr.path().is_ident("serde") {
+                continue;
             }
-            "asset" => {
-                if !is_field {
-                    return Err(nested_meta.error("asset attribute can only be used on fields"));
+
+            let meta_list = attr
+                .meta
+                .require_list()
+                .map_err(|err| syn::Error::new(err.span(), format!("{err}")))?;
+            let meta_list = meta_list
+                .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+                .map_err(|err| syn::Error::new(err.span(), format!("{err}")))?;
+
+            if !is_field {
+                for meta in &meta_list {
+                    if meta.path().is_ident("untagged") {
+                        serde_attributes.untagged = true;
+                    } else if meta.path().is_ident("tag") {
+                        let Some(name_value) = meta.require_name_value().ok() else {
+                            continue;
+                        };
+
+                        let Expr::Lit(lit) = &name_value.value else {
+                            continue;
+                        };
+
+                        let Lit::Str(lit_str) = &lit.lit else {
+                            continue;
+                        };
+
+                        serde_attributes.tag.replace(lit_str.to_token_stream());
+                    } else if meta.path().is_ident("content") {
+                        let Some(name_value) = meta.require_name_value().ok() else {
+                            continue;
+                        };
+
+                        let Expr::Lit(lit) = &name_value.value else {
+                            continue;
+                        };
+
+                        let Lit::Str(lit_str) = &lit.lit else {
+                            continue;
+                        };
+
+                        serde_attributes.content.replace(lit_str.to_token_stream());
+                    } else if meta.path().is_ident("rename_all") {
+                        serde_attributes.rename_all = SerdeRenameAll::try_from_meta(meta);
+                    } else if meta.path().is_ident("rename_all_fields") {
+                        serde_attributes.rename_all_fields = SerdeRenameAll::try_from_meta(meta);
+                    }
                 }
+            } else {
+                for meta in &meta_list {
+                    if meta.path().is_ident("skip") {
+                        serde_attributes.skip = true;
+                    } else if meta.path().is_ident("flatten") {
+                        serde_attributes.flatten = true;
+                    } else if meta.path().is_ident("rename") {
+                        let Some(name_value) = meta.require_name_value().ok() else {
+                            continue;
+                        };
 
-                if prototype_attributes.is_id {
-                    return Err(
-                        nested_meta.error("asset attribute cannot be used with id attribute")
-                    );
+                        let Expr::Lit(lit) = &name_value.value else {
+                            continue;
+                        };
+
+                        let Lit::Str(lit_str) = &lit.lit else {
+                            continue;
+                        };
+
+                        serde_attributes.rename.replace(lit_str.value());
+                    } else if meta.path().is_ident("default") {
+                        serde_attributes.default = true;
+                    }
                 }
-
-                if prototype_attributes.is_asset {
-                    return Err(nested_meta
-                        .error("asset attribute cannot be used more than once on the same field"));
-                }
-
-                if !nested_meta.input.is_empty() {
-                    return Err(nested_meta.error("asset attribute cannot have any arguments"));
-                }
-
-                prototype_attributes.is_asset = true;
-
-                Ok(())
             }
-            "discriminant" => {
-                if is_field {
-                    return Err(
-                        nested_meta.error("discriminant attribute cannot be used on fields")
-                    );
+        }
+
+        Ok(serde_attributes)
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SerdeRenameAll {
+    LowerCase,
+    UpperCase,
+    PascalCase,
+    CamelCase,
+    SnakeCase,
+    ScreamingSnakeCase,
+    KebabCase,
+    ScreamingKebabCase,
+}
+
+impl SerdeRenameAll {
+    pub fn try_from_meta(meta: &Meta) -> Option<SerdeRenameAll> {
+        let name_value = meta.require_name_value().ok()?;
+        let Expr::Lit(lit) = &name_value.value else {
+            return None;
+        };
+        let Lit::Str(lit_str) = &lit.lit else {
+            return None;
+        };
+
+        match lit_str.value().as_str() {
+            "lowercase" => Some(SerdeRenameAll::LowerCase),
+            "UPPERCASE" => Some(SerdeRenameAll::UpperCase),
+            "PascalCase" => Some(SerdeRenameAll::PascalCase),
+            "camelCase" => Some(SerdeRenameAll::CamelCase),
+            "snake_case" => Some(SerdeRenameAll::SnakeCase),
+            "SCREAMING_SNAKE_CASE" => Some(SerdeRenameAll::ScreamingSnakeCase),
+            "kebab-case" => Some(SerdeRenameAll::KebabCase),
+            "SCREAMING-KEBAB-CASE" => Some(SerdeRenameAll::ScreamingKebabCase),
+            _ => None,
+        }
+    }
+
+    pub fn apply_to_variant(self, variant: &str) -> String {
+        use SerdeRenameAll::*;
+
+        match self {
+            PascalCase => variant.to_owned(),
+            LowerCase => variant.to_ascii_lowercase(),
+            UpperCase => variant.to_ascii_uppercase(),
+            CamelCase => variant[..1].to_ascii_lowercase() + &variant[1..],
+            SnakeCase => {
+                let mut snake = String::new();
+                for (i, ch) in variant.char_indices() {
+                    if i > 0 && ch.is_uppercase() {
+                        snake.push('_');
+                    }
+                    snake.push(ch.to_ascii_lowercase());
                 }
-
-                if prototype_attributes.discriminant.is_some() {
-                    return Err(
-                        nested_meta.error("discriminant attribute cannot be used more than once")
-                    );
-                }
-
-                nested_meta.input.parse::<Token![=]>()?;
-
-                let discriminant = nested_meta.input.parse::<LitStr>()?.value();
-                prototype_attributes.discriminant = Some(discriminant);
-
-                Ok(())
+                snake
             }
-            "default" => {
-                if !is_field {
-                    return Err(nested_meta.error("default attribute can only be used on fields"));
-                }
+            ScreamingSnakeCase => SnakeCase.apply_to_variant(variant).to_ascii_uppercase(),
+            KebabCase => SnakeCase.apply_to_variant(variant).replace('_', "-"),
+            ScreamingKebabCase => ScreamingSnakeCase
+                .apply_to_variant(variant)
+                .replace('_', "-"),
+        }
+    }
 
-                if prototype_attributes.is_id {
-                    return Err(
-                        nested_meta.error("default attribute cannot be used with id attribute")
-                    );
-                }
+    pub fn apply_to_field(self, field: &str) -> String {
+        use SerdeRenameAll::*;
 
-                if prototype_attributes.default_expr.is_some()
-                    || prototype_attributes.default_func.is_some()
-                {
-                    return Err(nested_meta.error(
-                        "default attribute cannot be used more than once on the same field",
-                    ));
+        match self {
+            LowerCase | SnakeCase => field.to_owned(),
+            UpperCase => field.to_ascii_uppercase(),
+            PascalCase => {
+                let mut pascal = String::new();
+                let mut capitalize = true;
+                for ch in field.chars() {
+                    if ch == '_' {
+                        capitalize = true;
+                    } else if capitalize {
+                        pascal.push(ch.to_ascii_uppercase());
+                        capitalize = false;
+                    } else {
+                        pascal.push(ch);
+                    }
                 }
-
-                if nested_meta.input.parse::<Token![=]>().is_ok() {
-                    let default = nested_meta.input.parse::<LitStr>()?.value();
-                    prototype_attributes.default_func = Some(default);
-                } else {
-                    let content;
-                    parenthesized!(content in nested_meta.input);
-                    let default = content.parse::<Expr>()?;
-                    prototype_attributes.default_expr = Some(default);
-                }
-
-                Ok(())
+                pascal
             }
-            attr => Err(nested_meta.error(format!("unknown prototype attribute: {}", attr))),
-        },
-        _ => Ok(()), /* ignore no sub-attributes */
-    })?;
-
-    Ok(())
+            CamelCase => {
+                let pascal = PascalCase.apply_to_field(field);
+                pascal[..1].to_ascii_lowercase() + &pascal[1..]
+            }
+            ScreamingSnakeCase => field.to_ascii_uppercase(),
+            KebabCase => field.replace('_', "-"),
+            ScreamingKebabCase => ScreamingSnakeCase.apply_to_field(field).replace('_', "-"),
+        }
+    }
 }

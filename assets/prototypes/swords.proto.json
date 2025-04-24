@@ -1,21 +1,25 @@
 [
     {
         "type": "sword",
-        "id": "wooden_stick",
+        "name": "wooden_stick",
         "level": 1,
         "damage": 1.0,
+        "common": {
+            "taggy": "A",
+            "value": 32
+        },
         "effects": [],
-        "icon": "icons/wooden_stick.icon"
+        "icon": "wooden_stick.icon"
     },
     {
         "type": "sword",
-        "id": "mighty_sword",
+        "name": "mighty_sword",
         "level": 10,
         "damage": 10.0,
         "effects": [
             "bleeding",
             "freezing"
         ],
-        "icon": "icons/mighty_sword.icon"
+        "icon": "mighty_sword.icon"
     }
 ]

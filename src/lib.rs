@@ -1,22 +1,111 @@
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+use bevy::{
+    asset::AssetPath, ecs::system::SystemParam, platform::collections::HashMap, prelude::*,
+};
+use serde_json::{Map as JsonMap, Value as JsonValue, json};
 
-use bevy::{ecs::system::SystemId, platform_support::collections::HashMap, prelude::*};
-
-pub mod identifier;
-pub mod prototype;
-pub mod registry;
+mod identifier;
+mod prototype;
+mod registry;
+mod schema;
 
 pub use bevy_histrion_proto_derive::*;
-use prototype::*;
-use registry::*;
-use serde_json::Value as JsonValue;
+pub use identifier::*;
+pub use prototype::*;
+pub use registry::*;
+pub use schema::*;
 
 pub mod prelude {
-    pub use super::RegisterPrototype;
-    pub use crate::identifier::{Id, NamedId};
-    pub use crate::prototype::Prototype;
-    pub use crate::registry::{PrototypeServer, Reg, RegMut, RegistryError, RegistryEvent};
+    pub use crate::{
+        JsonSchema, PrototypeAppExt, PrototypeServer, identifier::*, prototype::*, registry::*,
+    };
     pub use bevy_histrion_proto_derive::*;
+}
+
+pub struct PrototypesPlugin;
+
+impl Plugin for PrototypesPlugin {
+    fn build(&self, app: &mut App) {
+        let app_prototype_type_registry = AppPrototypeTypeRegistry::default();
+
+        app.register_type::<ErasedPrototypeId>()
+            .register_type::<ErasedPrototypeName>()
+            .init_resource::<PrototypeRegistries>()
+            .init_resource::<LoadingPrototypesHandles>()
+            .init_resource::<PrototypesSchemas>()
+            .insert_resource(app_prototype_type_registry.clone());
+
+        let type_registry = app.world().resource::<AppTypeRegistry>().0.clone();
+
+        let prototypes_asset_loader = PrototypesAssetLoader {
+            prototype_type_registry: app_prototype_type_registry.0.clone(),
+            type_registry: type_registry.clone(),
+        };
+
+        app.init_asset::<PrototypesAsset>()
+            .register_asset_loader(prototypes_asset_loader)
+            .add_systems(Update, on_prototypes_asset_loaded);
+    }
+}
+
+fn on_prototypes_asset_loaded(
+    mut events_rx: EventReader<AssetEvent<PrototypesAsset>>,
+    mut assets: ResMut<Assets<PrototypesAsset>>,
+    mut registries: ResMut<PrototypeRegistries>,
+    mut loading_prototypes_handles: ResMut<LoadingPrototypesHandles>,
+    type_registry: Res<AppTypeRegistry>,
+) {
+    use bevy::reflect::DynamicStruct;
+
+    let type_registry = type_registry.read();
+
+    for event in events_rx.read() {
+        let AssetEvent::LoadedWithDependencies { id } = event else {
+            continue;
+        };
+
+        let Some(prototypes) = assets.remove(*id) else {
+            warn!("Asset {id} not found");
+            continue;
+        };
+
+        loading_prototypes_handles.remove(id);
+
+        for (ty, DynamicPrototype { name, tags, proto }) in &*prototypes {
+            let Some(proto_ty) = type_registry.get(*ty) else {
+                error!("Type {:?} not found in registry", ty);
+                continue;
+            };
+
+            let proto_data_short_path = proto_ty.type_info().type_path_table().short_path();
+            let proto_short_path = format!("Prototype<{proto_data_short_path}>");
+
+            // Get prototype type and check for errors
+            let Some(proto_ty) = type_registry.get_with_short_type_path(&proto_short_path) else {
+                error!("Failed to find prototype type {proto_short_path}");
+                continue;
+            };
+
+            let Some(dyn_proto) = proto_ty.data::<ReflectDefault>() else {
+                error!("Failed to find default for prototype type {proto_short_path}");
+                continue;
+            };
+
+            let mut dyn_proto = dyn_proto.default();
+
+            // Create dynamic structure for the prototype
+            let mut dyn_struct = DynamicStruct::default();
+            dyn_struct.insert("name", name.clone());
+            dyn_struct.insert("tags", tags.clone());
+            dyn_struct.insert_boxed("data", proto.to_dynamic());
+
+            if let Err(err) = dyn_proto.try_apply(dyn_struct.as_partial_reflect()) {
+                error!("Error applying dynamic prototype: {err}");
+                continue;
+            }
+
+            registries.insert_dyn(ty, name.id(), dyn_proto);
+        }
+    }
 }
 
 mod private {
@@ -25,184 +114,166 @@ mod private {
 
 impl private::Sealed for App {}
 
-pub trait RegisterPrototype: private::Sealed {
-    fn register_prototype<T: Prototype>(&mut self) -> &mut Self;
-
-    #[cfg(feature = "schemars")]
-    fn get_prototypes_schema(&self) -> schemars::schema::RootSchema;
+pub trait PrototypeAppExt: private::Sealed {
+    fn register_prototype<D: PrototypeData>(&mut self) -> &mut Self;
+    fn get_prototypes_schemas(&self) -> String;
 }
 
-impl RegisterPrototype for App {
-    fn register_prototype<P: Prototype>(&mut self) -> &mut Self {
-        let system_id = self.register_system(load_prototype::<P>);
+#[derive(Default, Resource)]
+pub(crate) struct PrototypesSchemas {
+    prototypes: HashMap<String, String>,
+    refs: JsonMap<String, JsonValue>,
+}
 
-        self.world_mut()
-            .resource_mut::<PrototypesLoaders>()
-            .insert(P::discriminant().to_owned(), system_id);
+impl PrototypeAppExt for App {
+    fn register_prototype<D: PrototypeData>(&mut self) -> &mut Self {
+        self.register_type::<Prototype<D>>();
 
-        self.init_resource::<PrototypeRegistry<P>>()
-            .add_event::<RegistryEvent<P>>();
+        if let Some(mut registries) = self.world_mut().get_resource_mut::<PrototypeRegistries>() {
+            registries.new_registry::<D>();
+        } else {
+            error!("PrototypeRegistries resource not found");
+            return self;
+        }
 
-        #[cfg(feature = "schemars")]
-        {
-            let mut prototypes_schemas = self.world_mut().resource_mut::<PrototypesSchemas>();
-            let mut generator = schemars::r#gen::SchemaGenerator::default();
-
-            prototypes_schemas.prototypes.insert(
-                <P::Raw as schemars::JsonSchema>::schema_name(),
-                <P::Raw as schemars::JsonSchema>::json_schema(&mut generator),
+        if let Some(mut schemas) = self.world_mut().get_resource_mut::<PrototypesSchemas>() {
+            schemas.prototypes.insert(
+                D::prototype_name().into(),
+                <Prototype<D> as JsonSchema>::schema_ref(),
             );
-            prototypes_schemas.discriminants.insert(
-                <P::Raw as schemars::JsonSchema>::schema_name(),
-                P::discriminant().to_owned(),
-            );
-            prototypes_schemas
-                .schemas
-                .extend(generator.definitions().clone());
+
+            let schema = <Prototype<D> as JsonSchema>::json_schema(&mut schemas.refs);
+            schemas
+                .refs
+                .insert(<Prototype<D> as JsonSchema>::schema_title(), schema);
+        } else {
+            error!("PrototypesSchemas resource not found");
+            return self;
+        }
+
+        if let Some(prototypes) = self.world().get_resource::<AppPrototypeTypeRegistry>() {
+            prototypes
+                .0
+                .write()
+                .insert(D::prototype_name().into(), core::any::TypeId::of::<D>());
+        } else {
+            error!("AppPrototypeTypeRegistry resource not found");
+            return self;
         }
 
         self
     }
 
-    #[cfg(feature = "schemars")]
-    fn get_prototypes_schema(&self) -> schemars::schema::RootSchema {
-        let prototypes_schemas = self.world().resource::<PrototypesSchemas>();
+    fn get_prototypes_schemas(&self) -> String {
+        let PrototypesSchemas { prototypes, refs } = self.world().resource::<PrototypesSchemas>();
+        let mut refs = refs.clone();
 
-        let mut definitions = prototypes_schemas.schemas.clone();
-        definitions.extend(prototypes_schemas.schemas.clone());
+        refs.insert(
+            "PrototypeAny".to_string(),
+            json!({
+                "type": "object",
+                "required": ["type", "name"],
+                "oneOf": prototypes.keys().map(|key| json!({
+                    "type": "object",
+                    "allOf": [
+                        {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "enum": [key],
+                                },
+                            },
+                        },
+                        {
+                            "$ref": prototypes.get(key).unwrap()
+                        }
+                    ]
+                })).collect::<Vec<_>>(),
+            }),
+        );
 
-        let any_prototype_schema =
-            schemars::schema::Schema::Object(schemars::schema::SchemaObject {
-                metadata: Some(Box::new(schemars::schema::Metadata {
-                    title: Some("PrototypeAny".to_string()),
-                    ..Default::default()
-                })),
-                subschemas: Some(Box::new(schemars::schema::SubschemaValidation {
-                    any_of: Some(
-                        prototypes_schemas
-                            .discriminants
-                            .iter()
-                            .map(|(key, discriminant)| {
-                                schemars::_private::new_internally_tagged_enum(
-                                    "type",
-                                    discriminant.as_str(),
-                                    false,
-                                )
-                                .flatten(prototypes_schemas.prototypes.get(key).unwrap().clone())
-                            })
-                            .collect::<Vec<_>>(),
-                    ),
-                    ..Default::default()
-                })),
-                ..Default::default()
-            });
-        definitions.insert("PrototypeAny".to_owned(), any_prototype_schema);
+        serde_json::to_string_pretty(&json!({
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "Prototype",
+            "type": ["object", "array"],
+            "oneOf": [
+                {
+                    "$ref": "#/definitions/PrototypeAny"
+                },
+                {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/PrototypeAny"
+                    },
+                }
+            ],
+            "definitions": refs,
+        }))
+        .unwrap()
+    }
+}
 
-        let draft_settings = schemars::r#gen::SchemaSettings::draft07();
+#[derive(Default, Resource, Deref, DerefMut)]
+pub(crate) struct LoadingPrototypesHandles(
+    HashMap<AssetId<PrototypesAsset>, Handle<PrototypesAsset>>,
+);
 
-        schemars::schema::RootSchema {
-            meta_schema: draft_settings.meta_schema,
-            schema: schemars::schema::SchemaObject {
-                metadata: Some(Box::new(schemars::schema::Metadata {
-                    title: Some("Prototype".to_owned()),
-                    ..Default::default()
-                })),
-                subschemas: Some(Box::new(schemars::schema::SubschemaValidation {
-                    any_of: Some(vec![
-                        schemars::schema::Schema::Object(schemars::schema::SchemaObject {
-                            instance_type: Some(schemars::schema::SingleOrVec::Single(Box::new(
-                                schemars::schema::InstanceType::Array,
-                            ))),
-                            array: Some(Box::new(schemars::schema::ArrayValidation {
-                                items: Some(schemars::schema::SingleOrVec::Single(Box::new(
-                                    schemars::schema::Schema::new_ref(
-                                        "#/definitions/PrototypeAny".to_owned(),
-                                    ),
-                                ))),
-                                ..Default::default()
-                            })),
-                            ..Default::default()
-                        }),
-                        schemars::schema::Schema::new_ref("#/definitions/PrototypeAny".to_owned()),
-                    ]),
-                    ..Default::default()
-                })),
-                ..Default::default()
-            },
-            definitions,
+#[derive(SystemParam)]
+pub struct PrototypeServer<'w> {
+    asset_server: Res<'w, AssetServer>,
+    loading_prototypes_handles: ResMut<'w, LoadingPrototypesHandles>,
+}
+
+impl PrototypeServer<'_> {
+    /// Loads a prototypes file from the given path.
+    pub fn load_prototypes(&mut self, path: &str) {
+        let handle: Handle<PrototypesAsset> = self.asset_server.load(path);
+        self.loading_prototypes_handles.insert(handle.id(), handle);
+    }
+
+    /// Loads all prototypes files from the given folder.
+    pub fn load_prototypes_folder(&mut self, path: &str) {
+        let files = {
+            let path: AssetPath<'_> = path.into();
+            let source = self.asset_server.get_source(path.source()).unwrap();
+            let source = source.reader();
+
+            bevy::tasks::block_on(async move {
+                use bevy::tasks::futures_lite::StreamExt;
+
+                let mut folder = source.read_directory(path.path()).await.unwrap();
+                let mut files = Vec::new();
+
+                while let Some(file) = folder.next().await {
+                    if !source.is_directory(&file).await.unwrap() {
+                        let file = file.to_string_lossy().to_string();
+                        let asset_path: AssetPath<'_> = (&file).into();
+
+                        let is_prototype_file = {
+                            let Some(full_extension) = asset_path.get_full_extension() else {
+                                continue;
+                            };
+
+                            PROTOTYPE_ASSET_EXTENSIONS.contains(&full_extension.as_str())
+                        };
+
+                        if is_prototype_file {
+                            files.push(file);
+                        }
+                    }
+                }
+
+                files
+            })
+        };
+
+        for file in files {
+            self.load_prototypes(&file);
         }
     }
 }
 
-fn load_prototype<P: Prototype>(
-    In(raw): In<JsonValue>,
-    mut registry: RegMut<P>,
-    asset_server: Res<AssetServer>,
-) {
-    let raw = match serde_json::from_value::<P::Raw>(raw) {
-        Ok(raw) => raw,
-        Err(err) => {
-            error!("Failed to load prototype: {}", err);
-            return;
-        }
-    };
-
-    let prototype = P::from_raw(raw, &asset_server);
-
-    if let Err(err) = registry.insert(prototype) {
-        error!("Failed to load prototype: {}", err);
-    }
-}
-
-#[derive(Debug, Default, Clone, Resource, Deref, DerefMut)]
-struct PrototypesLoaders(HashMap<String, SystemId<In<JsonValue>>>);
-
-#[cfg(feature = "schemars")]
-#[derive(Default, Resource)]
-struct PrototypesSchemas {
-    discriminants: schemars::Map<String, String>,
-    prototypes: schemars::Map<String, schemars::schema::Schema>,
-    schemas: schemars::Map<String, schemars::schema::Schema>,
-}
-
-pub struct HistrionProtoPlugin;
-
-impl Plugin for HistrionProtoPlugin {
-    fn build(&self, app: &mut App) {
-        app.init_resource::<PrototypesLoaders>()
-            .init_resource::<LoadingPrototypes>()
-            .init_asset::<prototype::RawPrototypeAsset>()
-            .register_asset_loader(prototype::RawPrototypeAssetLoader)
-            .add_systems(
-                Update,
-                on_raw_asset_loaded.run_if(on_event::<AssetEvent<prototype::RawPrototypeAsset>>),
-            );
-
-        #[cfg(feature = "schemars")]
-        app.init_resource::<PrototypesSchemas>();
-    }
-}
-
-fn on_raw_asset_loaded(
-    mut commands: Commands,
-    mut events: EventReader<AssetEvent<prototype::RawPrototypeAsset>>,
-    mut assets: ResMut<Assets<prototype::RawPrototypeAsset>>,
-    loaders: Res<PrototypesLoaders>,
-    mut loading: ResMut<LoadingPrototypes>,
-) {
-    for mut asset in events.read().filter_map(|event| match event {
-        AssetEvent::LoadedWithDependencies { id } => {
-            loading.handles.remove(id);
-            assets.remove(*id)
-        }
-        _ => None,
-    }) {
-        for raw in asset.drain() {
-            let Some(loader) = loaders.get(&raw.discriminant) else {
-                warn!("No loader found for prototype type: {}", raw.discriminant);
-                continue;
-            };
-            commands.run_system_with(*loader, raw.data);
-        }
-    }
+#[doc(hidden)]
+pub mod _private {
+    pub use serde_json;
 }

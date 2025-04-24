@@ -1,115 +1,200 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Prototype",
-  "anyOf": [
-    {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/PrototypeAny"
-      }
-    },
-    {
-      "$ref": "#/definitions/PrototypeAny"
-    }
-  ],
   "definitions": {
+    "Option<f32>": {
+      "$comment": "optional value",
+      "$ref": "#/definitions/f32",
+      "type": [
+        "object",
+        "null"
+      ]
+    },
     "PrototypeAny": {
-      "title": "PrototypeAny",
-      "anyOf": [
+      "oneOf": [
         {
-          "type": "object",
-          "required": [
-            "icon",
-            "id",
-            "type"
-          ],
-          "properties": {
-            "damage_multiplier": {
-              "type": [
-                "number",
-                "null"
-              ],
-              "format": "float"
+          "allOf": [
+            {
+              "properties": {
+                "type": {
+                  "enum": [
+                    "effect"
+                  ]
+                }
+              },
+              "type": "object"
             },
-            "icon": {
-              "type": "string"
-            },
-            "id": {
-              "type": "string"
-            },
-            "slow_duration": {
-              "type": [
-                "number",
-                "null"
-              ],
-              "format": "float"
-            },
-            "slow_factor": {
-              "type": [
-                "number",
-                "null"
-              ],
-              "format": "float"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "effect"
-              ]
+            {
+              "$ref": "#/definitions/bevy_histrion_proto::prototype::Prototype<schema::prototypes::Effect>"
             }
-          }
+          ],
+          "type": "object"
         },
         {
-          "type": "object",
-          "required": [
-            "effects",
-            "icon",
-            "id",
-            "level",
-            "type"
-          ],
-          "properties": {
-            "damage": {
-              "default": 1.0,
-              "type": "number",
-              "format": "float"
+          "allOf": [
+            {
+              "properties": {
+                "type": {
+                  "enum": [
+                    "sword"
+                  ]
+                }
+              },
+              "type": "object"
             },
-            "effects": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/PrototypeId"
-              }
-            },
-            "icon": {
-              "type": "string"
-            },
-            "id": {
-              "type": "string"
-            },
-            "level": {
-              "type": "integer",
-              "format": "uint32",
-              "minimum": 0.0
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "sword"
-              ]
+            {
+              "$ref": "#/definitions/bevy_histrion_proto::prototype::Prototype<schema::prototypes::Sword>"
             }
-          }
+          ],
+          "type": "object"
         }
-      ]
+      ],
+      "required": [
+        "type",
+        "name"
+      ],
+      "type": "object"
     },
     "PrototypeId": {
-      "anyOf": [
+      "$comment": "an identifier for a prototype",
+      "default": "",
+      "type": "string"
+    },
+    "PrototypeName": {
+      "$comment": "an identifier for a prototype",
+      "default": "",
+      "type": "string"
+    },
+    "Vec<PrototypeId>": {
+      "items": {
+        "$ref": "#/definitions/PrototypeId"
+      },
+      "type": "array"
+    },
+    "Vec<alloc::string::String>": {
+      "items": {
+        "$ref": "#/definitions/alloc::string::String"
+      },
+      "type": "array"
+    },
+    "alloc::string::String": {
+      "type": "string"
+    },
+    "bevy_asset::handle::Handle<schema::prototypes::Icon>": {
+      "$comment": "an asset path",
+      "type": "string"
+    },
+    "bevy_histrion_proto::prototype::Prototype<schema::prototypes::Effect>": {
+      "allOf": [
         {
-          "type": "string"
-        },
-        {
-          "type": "integer"
+          "$ref": "#/definitions/schema::prototypes::Effect"
         }
-      ]
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/PrototypeName"
+        },
+        "tags": {
+          "$ref": "#/definitions/Vec<alloc::string::String>"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "bevy_histrion_proto::prototype::Prototype<schema::prototypes::Sword>": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/schema::prototypes::Sword"
+        }
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/PrototypeName"
+        },
+        "tags": {
+          "$ref": "#/definitions/Vec<alloc::string::String>"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "f32": {
+      "$comment": "32-bit floating point number",
+      "default": 0.0,
+      "format": "double",
+      "maximum": 3.4028234663852886e38,
+      "minimum": -3.4028234663852886e38,
+      "type": "number"
+    },
+    "schema::prototypes::Effect": {
+      "properties": {
+        "damage_multiplier": {
+          "$ref": "#/definitions/Option<f32>"
+        },
+        "icon": {
+          "$ref": "#/definitions/bevy_asset::handle::Handle<schema::prototypes::Icon>"
+        },
+        "slow_duration": {
+          "$ref": "#/definitions/Option<f32>"
+        },
+        "slow_factor": {
+          "$ref": "#/definitions/Option<f32>"
+        }
+      },
+      "required": [
+        "icon"
+      ],
+      "type": "object"
+    },
+    "schema::prototypes::Sword": {
+      "properties": {
+        "damage": {
+          "$ref": "#/definitions/f32"
+        },
+        "effects": {
+          "$ref": "#/definitions/Vec<PrototypeId>"
+        },
+        "icon": {
+          "$ref": "#/definitions/bevy_asset::handle::Handle<schema::prototypes::Icon>"
+        },
+        "level": {
+          "$ref": "#/definitions/u32"
+        }
+      },
+      "required": [
+        "damage",
+        "level",
+        "effects",
+        "icon"
+      ],
+      "type": "object"
+    },
+    "u32": {
+      "$comment": "32-bit unsigned integer",
+      "default": 0,
+      "format": "u32",
+      "maximum": 4294967295,
+      "minimum": 0,
+      "type": "integer"
     }
-  }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/definitions/PrototypeAny"
+    },
+    {
+      "items": {
+        "$ref": "#/definitions/PrototypeAny"
+      },
+      "type": "array"
+    }
+  ],
+  "title": "Prototype",
+  "type": [
+    "object",
+    "array"
+  ]
 }

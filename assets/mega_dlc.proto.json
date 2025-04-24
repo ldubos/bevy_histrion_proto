@@ -1,7 +1,7 @@
 [
     {
         "type": "sword",
-        "id": "ultra_sword",
+        "name": "ultra_sword",
         "level": 100,
         "damage": 100.0,
         "effects": [
@@ -9,12 +9,12 @@
             "freezing",
             "pay_to_win"
         ],
-        "icon": "icons/ultra_sword.icon"
+        "icon": "./ultra_sword.icon"
     },
     {
         "type": "effect",
-        "id": "pay_to_win",
+        "name": "pay_to_win",
         "damage_multiplier": 1000.0,
-        "icon": "icons/pay_to_win.icon"
+        "icon": "./pay_to_win.icon"
     }
 ]

@@ -1,15 +1,15 @@
 [
     {
         "type": "effect",
-        "id": "bleeding",
+        "name": "bleeding",
         "damage_multiplier": 1.5,
-        "icon": "icons/bleeding.icon"
+        "icon": "bleeding.icon"
     },
     {
         "type": "effect",
-        "id": "freezing",
+        "name": "freezing",
         "slow_factor": 0.5,
         "slow_duration": 3.0,
-        "icon": "icons/freezing.icon"
+        "icon": "freezing.icon"
     }
 ]
